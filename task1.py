@@ -1,44 +1,30 @@
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
+import argparse
 
+def copy_file(file_path, target_dir):
+    ext = os.path.splitext(file_path)[1].lstrip('.').lower()
+    if not ext:
+        ext = 'unknown'
+    dest_dir = os.path.join(target_dir, ext)
+    os.makedirs(dest_dir, exist_ok=True)
+    shutil.copy2(file_path, dest_dir)
 
-def create_target_dirs(target_dir, extensions):
-    for ext in extensions:
-        os.makedirs(os.path.join(target_dir, ext), exist_ok=True)
-
-
-def copy_file(file, target_dir):
-    ext = file.split('.')[-1]
-    target_subdir = os.path.join(target_dir, ext)
-    shutil.copy(file, target_subdir)
-
-
-def process_directory(src_dir, target_dir):
-    extensions = set()
-    file_paths = []
-    for root, _, files in os.walk(src_dir):
+def process_directory(source_dir, target_dir, executor):
+    for root, _, files in os.walk(source_dir):
         for file in files:
             file_path = os.path.join(root, file)
-            ext = file.split('.')[-1]
-            extensions.add(ext)
-            file_paths.append(file_path)
+            executor.submit(copy_file, file_path, target_dir)
 
-    create_target_dirs(target_dir, extensions)
-
+def main(source_dir, target_dir):
     with ThreadPoolExecutor() as executor:
-        executor.map(lambda file: copy_file(file, target_dir), file_paths)
-
+        process_directory(source_dir, target_dir, executor)
 
 if __name__ == "__main__":
-    import sys
+    parser = argparse.ArgumentParser(description="Sort and copy files by extension.")
+    parser.add_argument("source_dir", help="Path to the directory with files to process.")
+    parser.add_argument("target_dir", nargs='?', default="dist", help="Path to the directory where sorted files will be placed.")
+    args = parser.parse_args()
 
-    if len(sys.argv) < 2:
-        print("Usage: python sort_files.py <source_directory> [<target_directory>]")
-        sys.exit(1)
-
-    src_dir = sys.argv[1]
-    target_dir = sys.argv[2] if len(sys.argv) > 2 else "dist"
-
-    process_directory(src_dir, target_dir)
-    print(f"Files from {src_dir} have been sorted and copied to {target_dir}.")
+    main(args.source_dir, args.target_dir)
