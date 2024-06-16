@@ -1,30 +1,39 @@
 import os
 import shutil
-from concurrent.futures import ThreadPoolExecutor
-import argparse
 
-def copy_file(file_path, target_dir):
-    ext = os.path.splitext(file_path)[1].lstrip('.').lower()
-    if not ext:
-        ext = 'unknown'
-    dest_dir = os.path.join(target_dir, ext)
-    os.makedirs(dest_dir, exist_ok=True)
-    shutil.copy2(file_path, dest_dir)
 
-def process_directory(source_dir, target_dir, executor):
+def process_directory(source_dir: str, target_dir: str = "dist"):
+    # Проверяем существование целевой директории
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+
+    # Рекурсивно обходим исходную директорию
     for root, _, files in os.walk(source_dir):
         for file in files:
-            file_path = os.path.join(root, file)
-            executor.submit(copy_file, file_path, target_dir)
+            source_path = os.path.join(root, file)
+            _, extension = os.path.splitext(file)
+            extension = extension[1:]  # убираем точку в начале расширения
 
-def main(source_dir, target_dir):
-    with ThreadPoolExecutor() as executor:
-        process_directory(source_dir, target_dir, executor)
+            # Создаем поддиректорию в целевой директории, если её нет
+            target_subdir = os.path.join(target_dir, extension)
+            os.makedirs(target_subdir, exist_ok=True)
+
+            # Копируем файл в целевую директорию
+            target_path = os.path.join(target_subdir, file)
+            shutil.copy(source_path, target_path)
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Sort and copy files by extension.")
-    parser.add_argument("source_dir", help="Path to the directory with files to process.")
-    parser.add_argument("target_dir", nargs='?', default="dist", help="Path to the directory where sorted files will be placed.")
-    args = parser.parse_args()
+    import sys
 
-    main(args.source_dir, args.target_dir)
+    # Проверяем аргументы командной строки
+    if len(sys.argv) < 2:
+        print("Usage: python sort_files.py <source_directory> [<target_directory>]")
+        sys.exit(1)
+
+    source_directory = sys.argv[1]
+    target_directory = sys.argv[2] if len(sys.argv) > 2 else "dist"
+
+    process_directory(source_directory, target_directory)
+
+    print("Files sorted successfully.")
